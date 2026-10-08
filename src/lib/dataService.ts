@@ -97,22 +97,22 @@ class DataService {
         this.queueState = storedQueue ? JSON.parse(storedQueue) : { ...initialQueueState };
       } else {
         const storedPlants = localStorage.getItem(KEY_PLANTS);
-        this.plants = storedPlants ? JSON.parse(storedPlants) : initialPlants;
+        this.plants = storedPlants ? JSON.parse(storedPlants) : seedPlants;
 
         const storedRounds = localStorage.getItem(KEY_ROUNDS);
-        this.rounds = storedRounds ? JSON.parse(storedRounds) : initialRounds;
+        this.rounds = storedRounds ? JSON.parse(storedRounds) : seedRounds;
 
         const storedHistory = localStorage.getItem(KEY_HISTORY);
-        this.history = storedHistory ? JSON.parse(storedHistory) : initialHistory;
+        this.history = storedHistory ? JSON.parse(storedHistory) : seedHistory;
 
         const storedReports = localStorage.getItem(KEY_REPORTS);
-        this.reports = storedReports ? JSON.parse(storedReports) : initialReports;
+        this.reports = storedReports ? JSON.parse(storedReports) : seedReports;
 
         const storedTeams = localStorage.getItem(KEY_TEAMS);
-        this.teams = storedTeams ? JSON.parse(storedTeams) : initialTeams;
+        this.teams = storedTeams ? JSON.parse(storedTeams) : seedTeams;
 
         const storedQueue = localStorage.getItem(KEY_QUEUE);
-        this.queueState = storedQueue ? JSON.parse(storedQueue) : initialQueueState;
+        this.queueState = storedQueue ? JSON.parse(storedQueue) : seedQueueState;
         if (!this.queueState.activePlantId && this.plants.length > 0) {
           this.queueState.activePlantId = this.plants[0].id;
         }
@@ -161,7 +161,11 @@ class DataService {
 
       if (pRes.data && pRes.data.length > 0) {
         this.plants = pRes.data.map(mapDbToSolarPlant);
+      } else if (this.plants.length > 0 && localStorage.getItem(KEY_CLEARED) !== 'true') {
+        // Auto push seed/local plants to Supabase if Supabase DB is empty
+        await this.syncAllToSupabase();
       }
+
       if (rRes.data && rRes.data.length > 0) {
         this.rounds = rRes.data.map(mapDbToMaintenanceRound);
       }
@@ -187,6 +191,73 @@ class DataService {
       this.saveToStorage();
     } catch (err) {
       console.warn('Could not sync with Supabase tables, using local state:', err);
+    }
+  }
+
+  public async syncAllToSupabase() {
+    if (!this.isSupabaseLive) return;
+    const supabase = getSupabase();
+    try {
+      if (this.plants.length > 0) {
+        const plantRows = this.plants.map((p) => ({
+          id: p.id,
+          queue_number: p.queueNumber,
+          no: p.no,
+          solar_plant: p.solarPlant,
+          capacity_kw: p.capacityKw,
+          location_area: p.locationArea,
+          property_village: p.propertyVillage,
+          map_url: p.mapUrl,
+          status: p.status,
+          qt_contract: p.qtContract,
+          contact_name: p.contactName,
+          tel: p.tel,
+          email: p.email,
+          other_contact: p.otherContact,
+          turn_on_date: p.turnOnDate || null,
+          latest_renew_contract: p.latestRenewContract || null,
+          ma_contract_expired: p.maContractExpired || null,
+          latest_maintenance: p.latestMaintenance || null,
+          om_contract_count: p.omContractCount,
+          total_count: p.totalCount,
+          current_round: p.currentRound,
+          note: p.note,
+        }));
+        for (let i = 0; i < plantRows.length; i += 100) {
+          await supabase.from('solar_plants').upsert(plantRows.slice(i, i + 100));
+        }
+      }
+
+      if (this.rounds.length > 0) {
+        const roundRows = this.rounds.map((r) => ({
+          id: r.id,
+          solar_plant_id: r.solarPlantId,
+          round_number: r.roundNumber,
+          scheduled_date: r.scheduledDate || null,
+          is_completed: r.isCompleted,
+          completed_at: r.completedAt || null,
+          team_name: r.teamName,
+          count_number: r.countNumber,
+          note: r.note,
+        }));
+        for (let i = 0; i < roundRows.length; i += 300) {
+          await supabase.from('maintenance_rounds').upsert(roundRows.slice(i, i + 300));
+        }
+      }
+
+      if (this.queueState) {
+        await supabase.from('queue_state').upsert({
+          id: 1,
+          current_queue_index: this.queueState.currentQueueIndex || 1,
+          current_round: this.queueState.currentRound || 1,
+          active_plant_id: this.queueState.activePlantId || (this.plants[0]?.id || null),
+          total_queues: this.queueState.totalQueues || this.plants.length,
+          updated_at: this.queueState.updatedAt || new Date().toISOString(),
+          updated_by: this.queueState.updatedBy || 'Admin',
+        });
+      }
+    } catch (err) {
+      console.error('Error syncing all to Supabase:', err);
     }
   }
 
@@ -928,6 +999,9 @@ class DataService {
 
     this.saveToStorage();
     this.notifyListeners();
+    if (this.isSupabaseLive) {
+      this.syncAllToSupabase();
+    }
   }
 
   // CLEAR ALL DATA OUT (Reset All Data)
@@ -964,6 +1038,9 @@ class DataService {
     } catch (e) {}
     this.saveToStorage();
     this.notifyListeners();
+    if (this.isSupabaseLive) {
+      this.syncAllToSupabase();
+    }
   }
 
   public resetToDefault() {

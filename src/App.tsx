@@ -60,12 +60,6 @@ export function App() {
 
   // Initialize Data Service and Listeners
   useEffect(() => {
-    // Clear out any old cached data as requested by user
-    if (localStorage.getItem('SOLAR_MAINT_CLEARED_FRESH') !== 'true') {
-      dataService.clearAllData();
-      localStorage.setItem('SOLAR_MAINT_CLEARED_FRESH', 'true');
-    }
-
     dataService.init().then(() => {
       syncState();
     });
