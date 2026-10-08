@@ -127,11 +127,10 @@ export const PlantDetailModal: React.FC<PlantDetailModalProps> = ({
                   <option value="Waiting">Waiting</option>
                   <option value="Not renew">Not renew</option>
                   <option value="Expired">Expired</option>
-                  <option value="(Blank)">(Blank)</option>
                 </select>
               ) : (
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_CONFIG[getStatusCategory(plant.status)]?.pill}`}>
-                  {plant.status && plant.status !== '(ว่าง)' && plant.status !== '(Blank)' && plant.status !== '-' ? plant.status : '(Blank)'}
+                  {plant.status && plant.status !== '(ว่าง)' && plant.status !== '(Blank)' && plant.status !== '-' ? plant.status : '-'}
                 </span>
               )}
             </div>

@@ -280,7 +280,6 @@ export const AddPlantModal: React.FC<AddPlantModalProps> = ({
                   <option value="Waiting">🟣 Waiting</option>
                   <option value="Not renew">⚪ Not renew</option>
                   <option value="Expired">🔴 Expired</option>
-                  <option value="(Blank)">(Blank)</option>
                 </select>
               </div>
 

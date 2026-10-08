@@ -176,7 +176,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
 
     const cat = getStatusCategory(status);
     const cfg = STATUS_CONFIG[cat];
-    const displayLabel = status && status !== '(ว่าง)' && status !== '(Blank)' && status !== '-' ? status : '(Blank)';
+    const displayLabel = status && status !== '(ว่าง)' && status !== '(Blank)' && status !== '-' ? status : '-';
 
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] ${cfg.pill}`}>

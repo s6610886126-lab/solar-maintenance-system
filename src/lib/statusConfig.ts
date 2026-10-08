@@ -49,7 +49,6 @@ export const STATUS_OPTIONS = [
   { id: 'waiting', label: 'Waiting', pill: 'bg-[#581c87] text-[#ffffff]' },
   { id: 'not_renew', label: 'Not renew', pill: 'bg-[#e2e8f0] text-[#334155]' },
   { id: 'expired', label: 'Expired', pill: 'bg-[#991b1b] text-[#ffffff]' },
-  { id: 'blank', label: '(Blank)', pill: 'bg-slate-800 text-slate-400' },
 ];
 
 export const getStatusCategory = (status?: string): 'send' | 'signed' | 'paid_active' | 'waiting' | 'not_renew' | 'expired' | 'blank' => {
