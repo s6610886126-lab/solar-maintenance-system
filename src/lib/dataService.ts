@@ -57,7 +57,8 @@ class DataService {
     if (conn.connected && conn.hasTables) {
       this.isSupabaseLive = true;
       await this.fetchFromSupabase();
-      // Disable realtime sync & heartbeat polling for independent client operation ("ต่างคนต่างทำ")
+      this.subscribeSupabaseRealtime();
+      this.startHeartbeatPolling();
     }
 
     this.isInitialized = true;
@@ -140,13 +141,12 @@ class DataService {
     if (this.isMutating) return;
     const supabase = getSupabase();
     try {
-      const [pRes, rRes, hRes, repRes, tRes, qRes] = await Promise.all([
+      const [pRes, rRes, hRes, repRes, tRes] = await Promise.all([
         supabase.from('solar_plants').select('*').order('queue_number'),
         supabase.from('maintenance_rounds').select('*'),
         supabase.from('maintenance_history').select('*').order('completed_at', { ascending: false }),
         supabase.from('ma_reports').select('*'),
         supabase.from('teams').select('*'),
-        supabase.from('queue_state').select('*').eq('id', 1).single(),
       ]);
 
       if (this.isMutating) return;
@@ -167,25 +167,14 @@ class DataService {
       if (tRes.data && tRes.data.length > 0) {
         this.teams = tRes.data;
       }
-      if (qRes.data) {
-        this.queueState = {
-          currentQueueIndex: qRes.data.current_queue_index,
-          currentRound: qRes.data.current_round,
-          activePlantId: qRes.data.active_plant_id,
-          totalQueues: qRes.data.total_queues,
-          updatedAt: qRes.data.updated_at,
-          updatedBy: qRes.data.updated_by || 'System',
-        };
-      } else {
-        this.queueState = {
-          currentQueueIndex: this.plants.length > 0 ? 1 : 0,
-          currentRound: 1,
-          activePlantId: this.plants[0]?.id || null,
-          totalQueues: this.plants.length,
-          updatedAt: new Date().toISOString(),
-          updatedBy: 'System',
-        };
+
+      // Preserve local queue state navigation, only update totalQueues and fallback activePlantId if empty
+      this.queueState.totalQueues = this.plants.length;
+      if (!this.queueState.activePlantId && this.plants.length > 0) {
+        this.queueState.currentQueueIndex = 1;
+        this.queueState.activePlantId = this.plants[0].id;
       }
+
       this.saveToStorage();
     } catch (err) {
       console.warn('Could not sync with Supabase tables, using local state:', err);
@@ -244,19 +233,6 @@ class DataService {
           if (error) console.error('Supabase maintenance_rounds upsert error:', error);
         }
       }
-
-      if (this.queueState) {
-        const { error } = await supabase.from('queue_state').upsert({
-          id: 1,
-          current_queue_index: this.queueState.currentQueueIndex || 1,
-          current_round: this.queueState.currentRound || 1,
-          active_plant_id: this.queueState.activePlantId || (this.plants[0]?.id || null),
-          total_queues: this.queueState.totalQueues || this.plants.length,
-          updated_at: this.queueState.updatedAt || new Date().toISOString(),
-          updated_by: this.queueState.updatedBy || 'Admin',
-        });
-        if (error) console.error('Supabase queue_state upsert error:', error);
-      }
     } catch (err) {
       console.error('Error syncing all to Supabase:', err);
     }
@@ -268,25 +244,13 @@ class DataService {
     const channel = supabase.channel('solar_maintenance_realtime');
 
     channel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_state' }, (payload) => {
-        if (payload.new) {
-          const row: any = payload.new;
-          this.queueState = {
-            currentQueueIndex: row.current_queue_index,
-            currentRound: row.current_round,
-            activePlantId: row.active_plant_id,
-            totalQueues: row.total_queues,
-            updatedAt: row.updated_at,
-            updatedBy: row.updated_by,
-          };
-          this.saveToStorage();
-          this.notifyListeners();
-        }
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'maintenance_history' }, () => {
         this.fetchFromSupabase().then(() => this.notifyListeners());
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'solar_plants' }, () => {
+        this.fetchFromSupabase().then(() => this.notifyListeners());
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'maintenance_rounds' }, () => {
         this.fetchFromSupabase().then(() => this.notifyListeners());
       })
       .subscribe();
