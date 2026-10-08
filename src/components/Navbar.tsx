@@ -184,6 +184,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Users className="w-4 h-4" />
             </button>
 
+            {/* Settings */}
+            <button
+              onClick={onOpenSettings}
+              title="Settings"
+              className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
             {/* Role Switcher */}
             <select
               value={userRole}

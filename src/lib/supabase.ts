@@ -1,12 +1,26 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const defaultUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lfaawqiyxdqrncwpvfib.supabase.co';
-const defaultKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmYWF3cWl5eGRxcm5jd3B2ZmliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMzA1NTgsImV4cCI6MjA5MzcwNjU1OH0.zlvrf_8SGmjsxfbmqcNAeaQ5pm4nZVykLJ1n9ihg0O4';
+const defaultKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlbGR0eW5wb3lyZ2hjYW9ld2hqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3OTg3NjIsImV4cCI6MjA5ODM3NDc2Mn0.i6WlVVzM_v6wncwWsepWrOaXygjvUWxJWsJsyySn02I';
 
 // Check for user-customized credentials in localStorage
 export const getSupabaseConfig = () => {
   const customUrl = localStorage.getItem('SOLAR_SUPABASE_URL');
   const customKey = localStorage.getItem('SOLAR_SUPABASE_KEY');
+  
+  // If user has old dead URL cached in localStorage, clear it automatically
+  if (customUrl && customUrl.includes('ueldtynpoyrghcaoewhj')) {
+    try {
+      localStorage.removeItem('SOLAR_SUPABASE_URL');
+      localStorage.removeItem('SOLAR_SUPABASE_KEY');
+    } catch (e) {}
+    return {
+      url: defaultUrl,
+      key: defaultKey,
+      isCustom: false,
+    };
+  }
+
   return {
     url: customUrl || defaultUrl,
     key: customKey || defaultKey,
