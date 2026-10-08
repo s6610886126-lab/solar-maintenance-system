@@ -221,17 +221,18 @@ class DataService {
           tel: p.tel,
           email: p.email,
           other_contact: p.otherContact,
-          turn_on_date: p.turnOnDate || null,
-          latest_renew_contract: p.latestRenewContract || null,
-          ma_contract_expired: p.maContractExpired || null,
-          latest_maintenance: p.latestMaintenance || null,
+          turn_on_date: cleanDate(p.turnOnDate),
+          latest_renew_contract: cleanDate(p.latestRenewContract),
+          ma_contract_expired: cleanDate(p.maContractExpired),
+          latest_maintenance: cleanDate(p.latestMaintenance),
           om_contract_count: p.omContractCount,
           total_count: p.totalCount,
           current_round: p.currentRound,
           note: p.note,
         }));
         for (let i = 0; i < plantRows.length; i += 100) {
-          await supabase.from('solar_plants').upsert(plantRows.slice(i, i + 100));
+          const { error } = await supabase.from('solar_plants').upsert(plantRows.slice(i, i + 100));
+          if (error) console.error('Supabase solar_plants upsert error:', error);
         }
       }
 
@@ -240,7 +241,7 @@ class DataService {
           id: r.id,
           solar_plant_id: r.solarPlantId,
           round_number: r.roundNumber,
-          scheduled_date: r.scheduledDate || null,
+          scheduled_date: cleanDate(r.scheduledDate),
           is_completed: r.isCompleted,
           completed_at: r.completedAt || null,
           team_name: r.teamName,
@@ -248,12 +249,13 @@ class DataService {
           note: r.note,
         }));
         for (let i = 0; i < roundRows.length; i += 300) {
-          await supabase.from('maintenance_rounds').upsert(roundRows.slice(i, i + 300));
+          const { error } = await supabase.from('maintenance_rounds').upsert(roundRows.slice(i, i + 300));
+          if (error) console.error('Supabase maintenance_rounds upsert error:', error);
         }
       }
 
       if (this.queueState) {
-        await supabase.from('queue_state').upsert({
+        const { error } = await supabase.from('queue_state').upsert({
           id: 1,
           current_queue_index: this.queueState.currentQueueIndex || 1,
           current_round: this.queueState.currentRound || 1,
@@ -262,6 +264,7 @@ class DataService {
           updated_at: this.queueState.updatedAt || new Date().toISOString(),
           updated_by: this.queueState.updatedBy || 'Admin',
         });
+        if (error) console.error('Supabase queue_state upsert error:', error);
       }
     } catch (err) {
       console.error('Error syncing all to Supabase:', err);
@@ -1257,6 +1260,17 @@ function mapDbToMAReport(row: any): MAReport {
     status: row.status || 'Pending',
     note: row.note || '',
   };
+}
+
+function cleanDate(d: any): string | null {
+  if (!d || typeof d !== 'string') return null;
+  const trimmed = d.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  if (trimmed.includes('T')) {
+    const part = trimmed.split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+  }
+  return null;
 }
 
 export const dataService = new DataService();
