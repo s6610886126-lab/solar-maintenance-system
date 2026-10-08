@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const defaultUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ueldtynpoyrghcaoewhj.supabase.co';
+const defaultUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lfaawqiyxdqrncwpvfib.supabase.co';
 const defaultKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlbGR0eW5wb3lyZ2hjYW9ld2hqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3OTg3NjIsImV4cCI6MjA5ODM3NDc2Mn0.i6WlVVzM_v6wncwWsepWrOaXygjvUWxJWsJsyySn02I';
 
 // Check for user-customized credentials in localStorage
