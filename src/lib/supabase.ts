@@ -62,12 +62,24 @@ export const checkSupabaseConnection = async (): Promise<{
     if (!error) {
       return { connected: true, hasTables: true };
     }
-    // If error contains relation does not exist
-    if (error.message && (error.message.includes('relation') || error.message.includes('schema cache'))) {
-      return { connected: true, hasTables: false, error: 'Database connected, but tables not created yet. Run supabase_schema.sql in SQL Editor.' };
+    const errMsg = error.message || 'Connection failed';
+    if (errMsg.includes('Failed to fetch') || errMsg.includes('fetch')) {
+      return { 
+        connected: false, 
+        hasTables: false, 
+        error: 'Cannot reach Supabase Server URL. Please verify your Project URL and Anon Key in Supabase Dashboard (or project might be paused).' 
+      };
     }
-    return { connected: false, hasTables: false, error: error.message };
+    return { connected: false, hasTables: false, error: errMsg };
   } catch (err: any) {
-    return { connected: false, hasTables: false, error: err.message || 'Connection failed' };
+    const msg = err?.message || '';
+    if (msg.includes('Failed to fetch') || msg.includes('fetch')) {
+      return { 
+        connected: false, 
+        hasTables: false, 
+        error: 'Cannot reach Supabase Server URL. Please verify your Project URL and Anon Key in Supabase Dashboard.' 
+      };
+    }
+    return { connected: false, hasTables: false, error: msg || 'Connection failed' };
   }
 };
