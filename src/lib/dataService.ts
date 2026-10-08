@@ -160,14 +160,11 @@ class DataService {
         supabase.from('queue_state').select('*').eq('id', 1).single(),
       ]);
 
-      if (pRes.data && pRes.data.length > 0) {
+      if (pRes.data) {
         this.plants = pRes.data.map(mapDbToSolarPlant);
-      } else if (this.plants.length > 0 && localStorage.getItem(KEY_CLEARED) !== 'true') {
-        // Auto push seed/local plants to Supabase if Supabase DB is empty
-        await this.syncAllToSupabase();
       }
 
-      if (rRes.data && rRes.data.length > 0) {
+      if (rRes.data) {
         this.rounds = rRes.data.map(mapDbToMaintenanceRound);
       }
       if (hRes.data) {
@@ -187,6 +184,15 @@ class DataService {
           totalQueues: qRes.data.total_queues,
           updatedAt: qRes.data.updated_at,
           updatedBy: qRes.data.updated_by || 'System',
+        };
+      } else {
+        this.queueState = {
+          currentQueueIndex: this.plants.length > 0 ? 1 : 0,
+          currentRound: 1,
+          activePlantId: this.plants[0]?.id || null,
+          totalQueues: this.plants.length,
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'System',
         };
       }
       this.saveToStorage();
