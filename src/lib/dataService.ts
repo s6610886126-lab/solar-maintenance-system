@@ -1030,7 +1030,7 @@ class DataService {
   }
 
   // CLEAR ALL DATA OUT (Reset All Data)
-  public clearAllData() {
+  public async clearAllData() {
     this.plants = [];
     this.rounds = [];
     this.history = [];
@@ -1048,6 +1048,29 @@ class DataService {
     } catch (e) {}
     this.saveToStorage();
     this.notifyListeners();
+
+    if (this.isSupabaseLive) {
+      try {
+        const supabase = getSupabase();
+        await Promise.all([
+          supabase.from('solar_plants').delete().neq('id', '___none___'),
+          supabase.from('maintenance_rounds').delete().neq('id', '___none___'),
+          supabase.from('maintenance_history').delete().neq('id', '___none___'),
+          supabase.from('ma_reports').delete().neq('id', '___none___'),
+          supabase.from('queue_state').upsert({
+            id: 1,
+            current_queue_index: 0,
+            current_round: 1,
+            active_plant_id: null,
+            total_queues: 0,
+            updated_at: new Date().toISOString(),
+            updated_by: 'Admin',
+          }),
+        ]);
+      } catch (err) {
+        console.error('Error clearing Supabase data:', err);
+      }
+    }
   }
 
   // Restore seed data from Excel template (279 plants)
