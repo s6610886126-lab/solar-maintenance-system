@@ -82,23 +82,72 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
           
           {/* Upload Area */}
           {!parsedData ? (
-            <div className="border-2 border-dashed border-slate-700 hover:border-emerald-500/80 rounded-2xl p-8 text-center transition bg-slate-950/40 cursor-pointer relative">
-              <input
-                type="file"
-                accept=".xlsx, .xls"
-                onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <FileSpreadsheet className="w-12 h-12 text-emerald-400 mx-auto mb-3 animate-pulse" />
-              <h3 className="text-base font-bold text-white">Drag & drop your Excel file (.xlsx) here, or click to browse</h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Automatically extracts data from sheets: Maintenance Schedule, MA Report Tracking
-              </p>
-              {isLoading && (
-                <div className="mt-4 text-xs font-semibold text-emerald-400 animate-pulse">
-                  Processing Excel file...
+            <div className="space-y-4">
+              <div className="border-2 border-dashed border-slate-700 hover:border-emerald-500/80 rounded-2xl p-8 text-center transition bg-slate-950/40 cursor-pointer relative">
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={handleFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <FileSpreadsheet className="w-12 h-12 text-emerald-400 mx-auto mb-3 animate-pulse" />
+                <h3 className="text-base font-bold text-white">Drag & drop your Excel file (.xlsx) here, or click to browse</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Automatically extracts data from sheets: Maintenance Schedule, MA Report Tracking
+                </p>
+                {isLoading && (
+                  <div className="mt-4 text-xs font-semibold text-emerald-400 animate-pulse">
+                    Processing Excel file...
+                  </div>
+                )}
+              </div>
+
+              {/* Sample Templates Section */}
+              <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-slate-300 flex items-center space-x-2">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                    <span>ดาวน์โหลดไฟล์ตัวอย่าง (Download Sample Excel Templates):</span>
+                  </span>
                 </div>
-              )}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <a
+                    href="/sample_customer_1_plant.xlsx"
+                    download="sample_customer_1_plant.xlsx"
+                    className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-emerald-600/20 hover:border-emerald-500/40 border border-slate-700/60 text-slate-200 hover:text-emerald-300 font-medium transition text-center flex flex-col items-center justify-center space-y-1"
+                  >
+                    <span className="font-semibold text-white">1 รายการ</span>
+                    <span className="text-[10px] text-slate-400">Sample (1 Customer)</span>
+                  </a>
+
+                  <a
+                    href="/sample_customer_2_plants.xlsx"
+                    download="sample_customer_2_plants.xlsx"
+                    className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-emerald-600/20 hover:border-emerald-500/40 border border-slate-700/60 text-slate-200 hover:text-emerald-300 font-medium transition text-center flex flex-col items-center justify-center space-y-1"
+                  >
+                    <span className="font-semibold text-white">2 รายการ</span>
+                    <span className="text-[10px] text-slate-400">Sample (2 Customers)</span>
+                  </a>
+
+                  <a
+                    href="/mock_maintenance_schedule_10_plants.xlsx"
+                    download="mock_maintenance_schedule_10_plants.xlsx"
+                    className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-blue-600/20 hover:border-blue-500/40 border border-slate-700/60 text-slate-200 hover:text-blue-300 font-medium transition text-center flex flex-col items-center justify-center space-y-1"
+                  >
+                    <span className="font-semibold text-white">10 รายการ</span>
+                    <span className="text-[10px] text-slate-400">Sample (10 Customers)</span>
+                  </a>
+
+                  <a
+                    href="/mock_maintenance_schedule_20_plants.xlsx"
+                    download="mock_maintenance_schedule_20_plants.xlsx"
+                    className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-purple-600/20 hover:border-purple-500/40 border border-slate-700/60 text-slate-200 hover:text-purple-300 font-medium transition text-center flex flex-col items-center justify-center space-y-1"
+                  >
+                    <span className="font-semibold text-white">20 รายการ</span>
+                    <span className="text-[10px] text-slate-400">Sample (20 Customers)</span>
+                  </a>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
