@@ -920,7 +920,7 @@ class DataService {
     this.notifyListeners();
   }
 
-  public importData(
+  public async importData(
     newPlants: SolarPlant[],
     newRounds: MaintenanceRound[],
     newReports: MAReport[],
@@ -929,18 +929,29 @@ class DataService {
     localStorage.removeItem(KEY_CLEARED);
 
     if (mode === 'replace_all') {
+      if (this.isSupabaseLive) {
+        try {
+          const supabase = getSupabase();
+          await Promise.all([
+            supabase.from('solar_plants').delete().neq('id', '___none___'),
+            supabase.from('maintenance_rounds').delete().neq('id', '___none___'),
+            supabase.from('ma_reports').delete().neq('id', '___none___'),
+          ]);
+        } catch (e) {}
+      }
       if (newPlants.length > 0) {
         this.plants = newPlants;
         this.queueState.totalQueues = newPlants.length;
         this.queueState.currentQueueIndex = 1;
         this.queueState.activePlantId = newPlants[0].id;
+      } else {
+        this.plants = [];
+        this.queueState.totalQueues = 0;
+        this.queueState.currentQueueIndex = 0;
+        this.queueState.activePlantId = null;
       }
-      if (newRounds.length > 0) {
-        this.rounds = newRounds;
-      }
-      if (newReports.length > 0) {
-        this.reports = newReports;
-      }
+      this.rounds = newRounds || [];
+      this.reports = newReports || [];
     } else if (mode === 'add_new_only') {
       const existingNames = new Set(this.plants.map((p) => p.solarPlant.trim().toLowerCase()));
       const existingIds = new Set(this.plants.map((p) => p.id));
@@ -1068,10 +1079,10 @@ class DataService {
     }
 
     this.saveToStorage();
-    this.notifyListeners();
     if (this.isSupabaseLive) {
-      this.syncAllToSupabase();
+      await this.syncAllToSupabase();
     }
+    this.notifyListeners();
   }
 
   // CLEAR ALL DATA OUT (Reset All Data)
@@ -1119,7 +1130,17 @@ class DataService {
   }
 
   // Restore seed data from Excel template (279 plants)
-  public restoreSeedData() {
+  public async restoreSeedData() {
+    if (this.isSupabaseLive) {
+      try {
+        const supabase = getSupabase();
+        await Promise.all([
+          supabase.from('solar_plants').delete().neq('id', '___none___'),
+          supabase.from('maintenance_rounds').delete().neq('id', '___none___'),
+          supabase.from('ma_reports').delete().neq('id', '___none___'),
+        ]);
+      } catch (e) {}
+    }
     this.plants = [...seedPlants];
     this.rounds = [...seedRounds];
     this.history = [...seedHistory];
@@ -1130,10 +1151,10 @@ class DataService {
       localStorage.removeItem(KEY_CLEARED);
     } catch (e) {}
     this.saveToStorage();
-    this.notifyListeners();
     if (this.isSupabaseLive) {
-      this.syncAllToSupabase();
+      await this.syncAllToSupabase();
     }
+    this.notifyListeners();
   }
 
   public resetToDefault() {
