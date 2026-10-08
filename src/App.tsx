@@ -263,18 +263,20 @@ export function App() {
       {/* Main App Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-1 w-full mt-4">
         
-        {/* KPI Top Stat Cards & Schedule Alerts */}
-        <StatsOverview
-          plants={plants}
-          rounds={rounds}
-          queueState={queueState}
-          history={history}
-          onSelectQueueView={() => setCurrentTab('queue')}
-          onFilterScheduleAlert={(alertType) => {
-            setScheduleAlertFilter(alertType);
-            setCurrentTab('dashboard');
-          }}
-        />
+        {/* KPI Top Stat Cards & Schedule Alerts (Dashboard view only) */}
+        {currentTab === 'dashboard' && (
+          <StatsOverview
+            plants={plants}
+            rounds={rounds}
+            queueState={queueState}
+            history={history}
+            onSelectQueueView={() => setCurrentTab('queue')}
+            onFilterScheduleAlert={(alertType) => {
+              setScheduleAlertFilter(alertType);
+              setCurrentTab('dashboard');
+            }}
+          />
+        )}
 
         {/* VIEW 1: DASHBOARD (Current Queue Banner + Full Table) */}
         {currentTab === 'dashboard' && (
