@@ -66,6 +66,7 @@ class DataService {
       this.isSupabaseLive = true;
       await this.fetchFromSupabase();
       this.subscribeSupabaseRealtime();
+      this.startHeartbeatPolling();
     }
 
     this.isInitialized = true;
@@ -289,6 +290,30 @@ class DataService {
         this.fetchFromSupabase().then(() => this.notifyListeners());
       })
       .subscribe();
+  }
+
+  private pollingTimer: any = null;
+
+  private startHeartbeatPolling() {
+    if (this.pollingTimer) clearInterval(this.pollingTimer);
+    this.pollingTimer = setInterval(async () => {
+      if (!this.isSupabaseLive) return;
+      try {
+        await this.fetchFromSupabase();
+        this.notifyListeners();
+      } catch (e) {
+        // Silent fail
+      }
+    }, 4000);
+  }
+
+  public async refreshData() {
+    if (this.isSupabaseLive) {
+      await this.fetchFromSupabase();
+    } else {
+      this.loadFromStorage();
+    }
+    this.notifyListeners();
   }
 
   // ==========================================
