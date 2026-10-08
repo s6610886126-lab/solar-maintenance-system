@@ -43,15 +43,7 @@ class DataService {
   private isInitialized: boolean = false;
 
   constructor() {
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      this.broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
-      this.broadcastChannel.onmessage = (event) => {
-        if (event.data?.type === 'STATE_CHANGED') {
-          this.loadFromStorage();
-          this.notifyListeners();
-        }
-      };
-    }
+    // Independent per device/browser tab: BroadcastChannel disabled
   }
 
   public async init() {
@@ -65,8 +57,7 @@ class DataService {
     if (conn.connected && conn.hasTables) {
       this.isSupabaseLive = true;
       await this.fetchFromSupabase();
-      this.subscribeSupabaseRealtime();
-      this.startHeartbeatPolling();
+      // Disable realtime sync & heartbeat polling for independent client operation ("ต่างคนต่างทำ")
     }
 
     this.isInitialized = true;
@@ -137,11 +128,6 @@ class DataService {
       localStorage.setItem(KEY_REPORTS, JSON.stringify(this.reports));
       localStorage.setItem(KEY_TEAMS, JSON.stringify(this.teams));
       localStorage.setItem(KEY_QUEUE, JSON.stringify(this.queueState));
-
-      // Broadcast to other tabs
-      if (this.broadcastChannel) {
-        this.broadcastChannel.postMessage({ type: 'STATE_CHANGED', timestamp: Date.now() });
-      }
     } catch (e) {
       console.error('Error saving to storage:', e);
     }
@@ -502,26 +488,6 @@ class DataService {
   public async advanceQueue(userName: string = 'Admin'): Promise<{ success: boolean; nextPlantName?: string; round?: number }> {
     if (!this.plants.length) return { success: false };
 
-    if (this.isSupabaseLive) {
-      try {
-        const supabase = getSupabase();
-        const { data, error } = await supabase.rpc('advance_queue', { p_user: userName });
-        if (!error && data) {
-          await this.fetchFromSupabase();
-          this.notifyListeners();
-          return {
-            success: true,
-            nextPlantName: data?.solar_plant_name,
-            round: data?.current_round,
-          };
-        } else {
-          console.warn('Supabase advance_queue RPC error, falling back to local state:', error);
-        }
-      } catch (e) {
-        console.warn('advanceQueue RPC failed, falling back to local state:', e);
-      }
-    }
-
     let nextIndex = this.queueState.currentQueueIndex + 1;
     let nextRound = this.queueState.currentRound;
 
@@ -566,21 +532,6 @@ class DataService {
 
     this.saveToStorage();
     this.notifyListeners();
-
-    if (this.isSupabaseLive) {
-      const supabase = getSupabase();
-      supabase.from('queue_state').upsert({
-        id: 1,
-        current_queue_index: this.queueState.currentQueueIndex,
-        current_round: this.queueState.currentRound,
-        active_plant_id: this.queueState.activePlantId,
-        total_queues: this.queueState.totalQueues,
-        updated_at: this.queueState.updatedAt,
-        updated_by: userName,
-      }).then((res) => {
-        if (res.error) console.error('Supabase setQueueToPlant error:', res.error);
-      });
-    }
   }
 
   public addPlant(newPlantData: Partial<SolarPlant> & { solarPlant: string }): SolarPlant {
