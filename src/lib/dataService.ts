@@ -552,6 +552,21 @@ class DataService {
 
     this.saveToStorage();
     this.notifyListeners();
+
+    if (this.isSupabaseLive) {
+      const supabase = getSupabase();
+      supabase.from('queue_state').upsert({
+        id: 1,
+        current_queue_index: this.queueState.currentQueueIndex,
+        current_round: this.queueState.currentRound,
+        active_plant_id: this.queueState.activePlantId,
+        total_queues: this.queueState.totalQueues,
+        updated_at: this.queueState.updatedAt,
+        updated_by: userName,
+      }).then((res) => {
+        if (res.error) console.error('Supabase setQueueToPlant error:', res.error);
+      });
+    }
   }
 
   public addPlant(newPlantData: Partial<SolarPlant> & { solarPlant: string }): SolarPlant {
@@ -714,6 +729,36 @@ class DataService {
       this.plants[idx] = { ...plant };
       this.saveToStorage();
       this.notifyListeners();
+
+      if (this.isSupabaseLive) {
+        const supabase = getSupabase();
+        supabase.from('solar_plants').upsert({
+          id: plant.id,
+          queue_number: plant.queueNumber,
+          no: plant.no,
+          solar_plant: plant.solarPlant,
+          capacity_kw: plant.capacityKw,
+          location_area: plant.locationArea,
+          property_village: plant.propertyVillage,
+          map_url: plant.mapUrl,
+          status: plant.status,
+          qt_contract: plant.qtContract,
+          contact_name: plant.contactName,
+          tel: plant.tel,
+          email: plant.email,
+          other_contact: plant.otherContact,
+          turn_on_date: plant.turnOnDate || null,
+          latest_renew_contract: plant.latestRenewContract || null,
+          ma_contract_expired: plant.maContractExpired || null,
+          latest_maintenance: plant.latestMaintenance || null,
+          om_contract_count: plant.omContractCount,
+          total_count: plant.totalCount,
+          current_round: plant.currentRound,
+          note: plant.note,
+        }).then((res) => {
+          if (res.error) console.error('Supabase update plant error:', res.error);
+        });
+      }
     }
   }
 
