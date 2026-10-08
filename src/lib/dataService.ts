@@ -147,8 +147,11 @@ class DataService {
     }
   }
 
+  private isMutating: boolean = false;
+
   // Fetch all tables from Supabase when connected
   private async fetchFromSupabase() {
+    if (this.isMutating) return;
     const supabase = getSupabase();
     try {
       const [pRes, rRes, hRes, repRes, tRes, qRes] = await Promise.all([
@@ -159,6 +162,8 @@ class DataService {
         supabase.from('teams').select('*'),
         supabase.from('queue_state').select('*').eq('id', 1).single(),
       ]);
+
+      if (this.isMutating) return;
 
       if (pRes.data) {
         this.plants = pRes.data.map(mapDbToSolarPlant);
@@ -1096,74 +1101,85 @@ class DataService {
 
   // CLEAR ALL DATA OUT (Reset All Data)
   public async clearAllData() {
-    this.plants = [];
-    this.rounds = [];
-    this.history = [];
-    this.reports = [];
-    this.queueState = {
-      currentQueueIndex: 0,
-      currentRound: 1,
-      activePlantId: null,
-      totalQueues: 0,
-      updatedAt: new Date().toISOString(),
-      updatedBy: 'Admin',
-    };
+    this.isMutating = true;
     try {
-      localStorage.setItem(KEY_CLEARED, 'true');
-    } catch (e) {}
-    this.saveToStorage();
-    this.notifyListeners();
-
-    if (this.isSupabaseLive) {
+      this.plants = [];
+      this.rounds = [];
+      this.history = [];
+      this.reports = [];
+      this.queueState = {
+        currentQueueIndex: 0,
+        currentRound: 1,
+        activePlantId: null,
+        totalQueues: 0,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'Admin',
+      };
       try {
-        const supabase = getSupabase();
-        await Promise.all([
-          supabase.from('solar_plants').delete().neq('id', '___none___'),
-          supabase.from('maintenance_rounds').delete().neq('id', '___none___'),
-          supabase.from('maintenance_history').delete().neq('id', '___none___'),
-          supabase.from('ma_reports').delete().neq('id', '___none___'),
-          supabase.from('queue_state').upsert({
-            id: 1,
-            current_queue_index: 0,
-            current_round: 1,
-            active_plant_id: null,
-            total_queues: 0,
-            updated_at: new Date().toISOString(),
-            updated_by: 'Admin',
-          }),
-        ]);
-      } catch (err) {
-        console.error('Error clearing Supabase data:', err);
+        localStorage.setItem(KEY_CLEARED, 'true');
+      } catch (e) {}
+      this.saveToStorage();
+      this.notifyListeners();
+
+      if (this.isSupabaseLive) {
+        try {
+          const supabase = getSupabase();
+          await Promise.all([
+            supabase.from('solar_plants').delete().neq('id', '___none___'),
+            supabase.from('maintenance_rounds').delete().neq('id', '___none___'),
+            supabase.from('maintenance_history').delete().neq('id', '___none___'),
+            supabase.from('ma_reports').delete().neq('id', '___none___'),
+            supabase.from('queue_state').upsert({
+              id: 1,
+              current_queue_index: 0,
+              current_round: 1,
+              active_plant_id: null,
+              total_queues: 0,
+              updated_at: new Date().toISOString(),
+              updated_by: 'Admin',
+            }),
+          ]);
+        } catch (err) {
+          console.error('Error clearing Supabase data:', err);
+        }
       }
+    } finally {
+      this.isMutating = false;
+      this.notifyListeners();
     }
   }
 
   // Restore seed data from Excel template (279 plants)
   public async restoreSeedData() {
-    if (this.isSupabaseLive) {
-      try {
-        const supabase = getSupabase();
-        await Promise.all([
-          supabase.from('solar_plants').delete().neq('id', '___none___'),
-          supabase.from('maintenance_rounds').delete().neq('id', '___none___'),
-          supabase.from('ma_reports').delete().neq('id', '___none___'),
-        ]);
-      } catch (e) {}
-    }
-    this.plants = [...seedPlants];
-    this.rounds = [...seedRounds];
-    this.history = [...seedHistory];
-    this.reports = [...seedReports];
-    this.teams = [...seedTeams];
-    this.queueState = { ...seedQueueState };
+    this.isMutating = true;
     try {
-      localStorage.removeItem(KEY_CLEARED);
-    } catch (e) {}
-    this.saveToStorage();
-    if (this.isSupabaseLive) {
-      await this.syncAllToSupabase();
+      this.plants = [...seedPlants];
+      this.rounds = [...seedRounds];
+      this.history = [...seedHistory];
+      this.reports = [...seedReports];
+      this.teams = [...seedTeams];
+      this.queueState = { ...seedQueueState };
+      try {
+        localStorage.removeItem(KEY_CLEARED);
+      } catch (e) {}
+      this.saveToStorage();
+      this.notifyListeners();
+
+      if (this.isSupabaseLive) {
+        try {
+          const supabase = getSupabase();
+          await Promise.all([
+            supabase.from('solar_plants').delete().neq('id', '___none___'),
+            supabase.from('maintenance_rounds').delete().neq('id', '___none___'),
+            supabase.from('ma_reports').delete().neq('id', '___none___'),
+          ]);
+        } catch (e) {}
+        await this.syncAllToSupabase();
+      }
+    } finally {
+      this.isMutating = false;
+      this.notifyListeners();
     }
-    this.notifyListeners();
   }
 
   public resetToDefault() {
