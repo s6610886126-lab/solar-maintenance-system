@@ -381,6 +381,7 @@ export function App() {
           onClose={() => setSelectedPlant(null)}
           onUpdatePlant={(up) => {
             dataService.updatePlant(up);
+            setSelectedPlant(up);
             showToast('Saved plant details successfully', 'success');
           }}
           onUpdateRound={(plantId, roundNum, data) => {

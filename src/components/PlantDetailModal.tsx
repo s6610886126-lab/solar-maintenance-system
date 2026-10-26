@@ -48,6 +48,12 @@ export const PlantDetailModal: React.FC<PlantDetailModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<SolarPlant>({ ...plant });
 
+  React.useEffect(() => {
+    if (plant) {
+      setFormData({ ...plant });
+    }
+  }, [plant]);
+
   // State for inline round editing
   const [editingRoundNum, setEditingRoundNum] = useState<number | null>(null);
   const [roundDate, setRoundDate] = useState<string>('');
@@ -110,7 +116,7 @@ export const PlantDetailModal: React.FC<PlantDetailModalProps> = ({
         
         {/* Modal Header */}
         <div className="p-6 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/60">
-          <div>
+          <div className="flex-1 mr-4">
             <div className="flex items-center space-x-2">
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
                 Queue #{plant.queueNumber}
@@ -134,18 +140,87 @@ export const PlantDetailModal: React.FC<PlantDetailModalProps> = ({
                 </span>
               )}
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
-              {plant.solarPlant}
-            </h2>
-            <p className="text-xs text-slate-400 flex items-center space-x-1.5 mt-0.5">
-              <MapPin className="w-3.5 h-3.5 text-slate-400 inline" />
-              <span>{plant.locationArea || 'Unspecified Area'}</span>
-              {plant.propertyVillage && <span>• {plant.propertyVillage}</span>}
-            </p>
+            {isEditing ? (
+              <div className="mt-2 space-y-2">
+                <input
+                  type="text"
+                  placeholder="Solar Plant / Customer Name"
+                  value={formData.solarPlant}
+                  onChange={(e) => setFormData({ ...formData, solarPlant: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 focus:border-blue-400 rounded-xl px-3 py-1.5 text-base sm:text-lg font-bold text-white focus:outline-none"
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Location / Area"
+                    value={formData.locationArea}
+                    onChange={(e) => setFormData({ ...formData, locationArea: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-blue-400 rounded-lg px-2.5 py-1 text-xs text-slate-300 focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Property / Village"
+                    value={formData.propertyVillage}
+                    onChange={(e) => setFormData({ ...formData, propertyVillage: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-blue-400 rounded-lg px-2.5 py-1 text-xs text-slate-300 focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Google Maps URL"
+                    value={formData.mapUrl}
+                    onChange={(e) => setFormData({ ...formData, mapUrl: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-blue-400 rounded-lg px-2.5 py-1 text-xs text-slate-300 focus:outline-none"
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                  {plant.solarPlant}
+                </h2>
+                <p className="text-xs text-slate-400 flex items-center space-x-1.5 mt-0.5">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 inline" />
+                  <span>{plant.locationArea || 'Unspecified Area'}</span>
+                  {plant.propertyVillage && <span>• {plant.propertyVillage}</span>}
+                </p>
+              </>
+            )}
           </div>
 
-          <div className="flex items-center space-x-2">
-            {plant.mapUrl && (
+          <div className="flex items-center space-x-2 shrink-0">
+            {isEditing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSavePlant}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 flex items-center space-x-1.5 transition cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save Changes</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({ ...plant });
+                    setIsEditing(false);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 transition cursor-pointer"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-blue-400" />
+                <span>Edit Info</span>
+              </button>
+            )}
+
+            {plant.mapUrl && !isEditing && (
               <a
                 href={plant.mapUrl}
                 target="_blank"
@@ -157,7 +232,7 @@ export const PlantDetailModal: React.FC<PlantDetailModalProps> = ({
             )}
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -169,34 +244,151 @@ export const PlantDetailModal: React.FC<PlantDetailModalProps> = ({
           
           {/* Key Indicators Row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-slate-800/80">
-              <span className="text-[11px] text-slate-400 font-medium block">Capacity</span>
-              <span className="text-base font-bold text-white flex items-center space-x-1 mt-0.5">
-                <Zap className="w-4 h-4 text-amber-400" />
-                <span>{plant.capacityKw ? `${plant.capacityKw} kW` : '-'}</span>
-              </span>
+            {/* 1. Capacity */}
+            <div className={`p-3.5 rounded-2xl bg-slate-950/40 border transition ${isEditing ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-slate-800/80'}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400 font-medium block">Capacity</span>
+                {!isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="text-slate-500 hover:text-amber-400 transition cursor-pointer"
+                    title="Click to edit"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+              {isEditing ? (
+                <div className="mt-1.5 flex items-center space-x-1.5">
+                  <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="0.00"
+                    value={formData.capacityKw !== null && formData.capacityKw !== undefined ? formData.capacityKw : ''}
+                    onChange={(e) => setFormData({ ...formData, capacityKw: e.target.value === '' ? null : parseFloat(e.target.value) })}
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1 text-sm font-bold text-white focus:outline-none"
+                  />
+                  <span className="text-xs text-slate-400 shrink-0">kW</span>
+                </div>
+              ) : (
+                <span className="text-base font-bold text-white flex items-center space-x-1 mt-0.5">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  <span>{plant.capacityKw ? `${plant.capacityKw} kW` : '-'}</span>
+                </span>
+              )}
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-slate-800/80">
-              <span className="text-[11px] text-slate-400 font-medium block">O&M Contract</span>
-              <span className="text-base font-bold text-amber-300 mt-0.5 block">
-                {plant.omContractCount || 4} times / year
-              </span>
-              <span className="text-[10px] text-slate-500 block truncate">{plant.maintenancePeriod || '-'}</span>
+            {/* 2. O&M Contract */}
+            <div className={`p-3.5 rounded-2xl bg-slate-950/40 border transition ${isEditing ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-slate-800/80'}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400 font-medium block">O&M Contract</span>
+                {!isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="text-slate-500 hover:text-amber-400 transition cursor-pointer"
+                    title="Click to edit"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+              {isEditing ? (
+                <div className="mt-1.5 space-y-1.5">
+                  <div className="flex items-center space-x-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      max="24"
+                      value={formData.omContractCount || 4}
+                      onChange={(e) => setFormData({ ...formData, omContractCount: parseInt(e.target.value, 10) || 4 })}
+                      className="w-16 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1 text-sm font-bold text-amber-300 focus:outline-none"
+                    />
+                    <span className="text-xs text-amber-300/90 font-medium">times / year</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Period / Remark"
+                    value={formData.maintenancePeriod || ''}
+                    onChange={(e) => setFormData({ ...formData, maintenancePeriod: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-300 placeholder-slate-600 focus:outline-none"
+                  />
+                </div>
+              ) : (
+                <>
+                  <span className="text-base font-bold text-amber-300 mt-0.5 block">
+                    {plant.omContractCount || 4} times / year
+                  </span>
+                  <span className="text-[10px] text-slate-500 block truncate">{plant.maintenancePeriod || '-'}</span>
+                </>
+              )}
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-slate-800/80">
-              <span className="text-[11px] text-slate-400 font-medium block">Latest Maintenance</span>
-              <span className="text-sm font-bold text-white mt-1 block">
-                {plant.latestMaintenance || '-'}
-              </span>
+            {/* 3. Latest Maintenance */}
+            <div className={`p-3.5 rounded-2xl bg-slate-950/40 border transition ${isEditing ? 'border-blue-500/40 ring-1 ring-blue-500/20' : 'border-slate-800/80'}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400 font-medium block">Latest Maintenance</span>
+                {!isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="text-slate-500 hover:text-blue-400 transition cursor-pointer"
+                    title="Click to edit"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+              {isEditing ? (
+                <div className="mt-1.5">
+                  <input
+                    type="date"
+                    lang="en-GB"
+                    value={formData.latestMaintenance || ''}
+                    onChange={(e) => setFormData({ ...formData, latestMaintenance: e.target.value || null })}
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-blue-400 rounded-lg px-2 py-1 text-xs font-semibold text-white focus:outline-none"
+                  />
+                </div>
+              ) : (
+                <span className="text-sm font-bold text-white mt-1 block">
+                  {plant.latestMaintenance ? formatDateDMY(plant.latestMaintenance) : '-'}
+                </span>
+              )}
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-slate-800/80">
-              <span className="text-[11px] text-slate-400 font-medium block">Total Count</span>
-              <span className="text-base font-black text-emerald-400 mt-0.5 block">
-                {plant.totalCount || 0} completed
-              </span>
+            {/* 4. Total Count */}
+            <div className={`p-3.5 rounded-2xl bg-slate-950/40 border transition ${isEditing ? 'border-emerald-500/40 ring-1 ring-emerald-500/20' : 'border-slate-800/80'}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400 font-medium block">Total Count</span>
+                {!isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="text-slate-500 hover:text-emerald-400 transition cursor-pointer"
+                    title="Click to edit"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+              {isEditing ? (
+                <div className="mt-1.5 flex items-center space-x-1.5">
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.totalCount ?? 0}
+                    onChange={(e) => setFormData({ ...formData, totalCount: parseInt(e.target.value, 10) || 0 })}
+                    className="w-20 bg-slate-900 border border-slate-700 focus:border-emerald-400 rounded-lg px-2 py-1 text-sm font-bold text-emerald-400 focus:outline-none"
+                  />
+                  <span className="text-xs text-emerald-400/90 font-medium">completed</span>
+                </div>
+              ) : (
+                <span className="text-base font-black text-emerald-400 mt-0.5 block">
+                  {plant.totalCount || 0} completed
+                </span>
+              )}
             </div>
           </div>
 
