@@ -4,13 +4,19 @@ import { SolarPlant, MaintenanceRound, MaintenanceHistory, MAReport } from '../t
 export interface ParsedExcelData {
   plants: SolarPlant[];
   rounds: MaintenanceRound[];
+  history: MaintenanceHistory[];
   reports: MAReport[];
   sheetNames: string[];
 }
 
 function getCellValueText(val: any): string {
   if (val === null || val === undefined) return '';
-  if (val instanceof Date) return val.toISOString().split('T')[0];
+  if (val instanceof Date) {
+    const yyyy = val.getFullYear();
+    const mm = String(val.getMonth() + 1).padStart(2, '0');
+    const dd = String(val.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
   if (typeof val === 'object') {
     if (val.result !== undefined && val.result !== null) return String(val.result);
     if (val.text !== undefined && val.text !== null) return String(val.text);
@@ -18,6 +24,62 @@ function getCellValueText(val: any): string {
     return '';
   }
   return String(val).trim();
+}
+
+function formatDateLocal(val: any): string | null {
+  if (!val) return null;
+  if (val instanceof Date) {
+    const yyyy = val.getFullYear();
+    const mm = String(val.getMonth() + 1).padStart(2, '0');
+    const dd = String(val.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (s.includes('T')) {
+    const part = s.split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+  }
+  const m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) {
+    return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  }
+  return s || null;
+}
+
+function isCheckDone(val: any): boolean {
+  if (val === true || val === 1) return true;
+  if (!val) return false;
+  const s = String(val).trim().toLowerCase();
+  return (
+    s === 'true' ||
+    s === '✓' ||
+    s === '✔' ||
+    s === '1' ||
+    s === 'yes' ||
+    s === 'y' ||
+    s === 'done' ||
+    s === 'ผ่าน' ||
+    s === 'เสร็จ'
+  );
+}
+
+function parseOmContractCount(raw: string): number {
+  if (!raw) return 4;
+  const trimmed = raw.trim();
+  const num = parseInt(trimmed, 10);
+  if (num && num > 0 && num <= 24) return num;
+
+  const slashMatch = trimmed.match(/^(\d+)\s*\/\s*\d+/);
+  if (slashMatch) {
+    const n = parseInt(slashMatch[1], 10);
+    if (n > 0 && n <= 24) return n;
+  }
+
+  const smallMatch = trimmed.match(/\b([1-9]|1[0-2])\b/);
+  if (smallMatch) return parseInt(smallMatch[0], 10);
+
+  return 4;
 }
 
 /**
@@ -40,85 +102,178 @@ export const parseExcelFile = async (file: File): Promise<ParsedExcelData> => {
 
   const plants: SolarPlant[] = [];
   const rounds: MaintenanceRound[] = [];
+  const history: MaintenanceHistory[] = [];
   let queueOrder = 1;
 
   if (scheduleSheet) {
+    // 1. Dynamically locate the header row (search rows 1 to 10)
+    let headerRowIndex = 1;
+    for (let r = 1; r <= 10; r++) {
+      const row = scheduleSheet.getRow(r);
+      let foundPlant = false;
+      row.eachCell((cell) => {
+        const txt = getCellValueText(cell.value).toLowerCase();
+        if (txt.includes('solar plant') || txt.includes('plant') || txt.includes('customer')) {
+          foundPlant = true;
+        }
+      });
+      if (foundPlant) {
+        headerRowIndex = r;
+        break;
+      }
+    }
+
+    // 2. Map header columns dynamically by name
+    const headerRow = scheduleSheet.getRow(headerRowIndex);
+    const headers: { col: number; txt: string }[] = [];
+    headerRow.eachCell((cell, col) => {
+      const txt = getCellValueText(cell.value).toLowerCase().replace(/[\r\n\t]+/g, ' ').trim();
+      headers.push({ col, txt });
+    });
+
+    const getCol = (keywords: string[]): number | null => {
+      for (const kw of keywords) {
+        const found = headers.find((h) => h.txt.includes(kw));
+        if (found) return found.col;
+      }
+      return null;
+    };
+
+    const noCol = getCol(['no', 'ลำดับ']);
+    const nameCol = getCol(['solar plant', 'plant', 'customer']) || 2;
+    const capCol = getCol(['capacity', 'kw']);
+    const locCol = getCol(['location', 'area', 'พื้นที่']);
+    const propCol = getCol(['property', 'village', 'หมู่บ้าน']);
+    const mapCol = getCol(['map', 'google map']);
+    const statusCol = getCol(['status', 'สถานะ']);
+    const qtCol = getCol(['qt & contract', 'qt']);
+    const dateIssueCol = getCol(['date issue', 'issue']);
+    const acceptCol = getCol(['contract accept', 'accept']);
+    const paidDateCol = getCol(['paid date', 'paid']);
+    const contactNameCol = getCol(['name', 'ชื่อ']);
+    const telCol = getCol(['tel', 'เบอร์']);
+    const emailCol = getCol(['email', 'อีเมล']);
+    const otherContactCol = getCol(['other contact', 'ติดต่อ']);
+    const turnOnCol = getCol(['turn on', 'cod']);
+    const renewCol = getCol(['latest renew', 'renew']);
+    const expiredCol = getCol(['ma contract expired', 'expired']);
+    const latestMaintCol = getCol(['latest maintenance', 'ล้างล่าสุด']);
+    const periodCol = getCol(['period', 'รอบ']);
+
+    // Detect first round column (find '1st' or 'round 1')
+    let firstRoundCol: number | null = null;
+    for (const h of headers) {
+      if (h.txt === '1st' || h.txt.startsWith('1st ') || h.txt === 'round 1' || h.txt === 'รอบ 1') {
+        if (!firstRoundCol || h.col < firstRoundCol) {
+          firstRoundCol = h.col;
+        }
+      }
+    }
+    if (!firstRoundCol) {
+      firstRoundCol = 20; // fallback default
+    }
+
+    // Detect O&M Contract column:
+    // Look for explicit header "o&m contract" or "round", otherwise column immediately before 1st round
+    let omCol = getCol(['o&m contract', 'round']);
+    if (!omCol || omCol >= firstRoundCol) {
+      omCol = firstRoundCol - 1;
+    }
+
+    // 3. Parse data rows starting after headerRowIndex
     scheduleSheet.eachRow((row, rowNumber) => {
-      const cell1Text = getCellValueText(row.getCell(1).value).toLowerCase();
-      const rawName = row.getCell(2).value;
+      if (rowNumber <= headerRowIndex) return;
+
+      const rawName = row.getCell(nameCol).value;
       if (!rawName) return;
 
       const name = getCellValueText(rawName).trim();
-      if (!name || name.toLowerCase() === 'solar plant' || cell1Text === 'no') return;
+      if (!name || name.toLowerCase() === 'solar plant' || name.toLowerCase() === 'name') return;
 
-      const queueNo = parseInt(getCellValueText(row.getCell(1).value)) || queueOrder;
+      const queueNo = noCol ? parseInt(getCellValueText(row.getCell(noCol).value), 10) || queueOrder : queueOrder;
       const plantId = `import-plant-${queueOrder}`;
-      const rawCap = row.getCell(3).value;
+
+      const rawCap = capCol ? row.getCell(capCol).value : null;
       const capacity = rawCap ? parseFloat(String(rawCap)) || null : null;
 
-      const location = getCellValueText(row.getCell(4).value);
-      const property = getCellValueText(row.getCell(5).value);
-      const status = getCellValueText(row.getCell(6).value) || 'Active';
+      const location = locCol ? getCellValueText(row.getCell(locCol).value) : '';
+      const property = propCol ? getCellValueText(row.getCell(propCol).value) : '';
+      const status = statusCol ? getCellValueText(row.getCell(statusCol).value) || 'Active' : 'Active';
 
-      const rawQt: any = row.getCell(7).value;
+      const rawQt = qtCol ? row.getCell(qtCol).value : null;
       const qtContract = rawQt === true || rawQt === 'true' || rawQt === 'TRUE' || rawQt === 1 || rawQt === 'มี' ? 'true' : 'false';
 
-      const dateIssueNewContract = getCellValueText(row.getCell(8).value) || null;
+      const dateIssueNewContract = dateIssueCol ? formatDateLocal(row.getCell(dateIssueCol).value) : null;
 
-      const rawAccept: any = row.getCell(9).value;
+      const rawAccept = acceptCol ? row.getCell(acceptCol).value : null;
       const contractAccept = rawAccept === true || rawAccept === 'true' || rawAccept === 'TRUE' || rawAccept === 1 || rawAccept === 'ตอบรับแล้ว' ? 'true' : 'false';
 
-      const paidDate = getCellValueText(row.getCell(10).value) || null;
+      const paidDate = paidDateCol ? formatDateLocal(row.getCell(paidDateCol).value) : null;
+      const contactName = contactNameCol ? getCellValueText(row.getCell(contactNameCol).value) : '';
+      const tel = telCol ? getCellValueText(row.getCell(telCol).value) : '';
+      const email = emailCol ? getCellValueText(row.getCell(emailCol).value) : '';
+      const otherContact = otherContactCol ? getCellValueText(row.getCell(otherContactCol).value) : '';
 
-      const contactName = getCellValueText(row.getCell(11).value);
-      const tel = getCellValueText(row.getCell(12).value);
-      const email = getCellValueText(row.getCell(13).value);
-      const otherContact = getCellValueText(row.getCell(14).value);
+      const turnOnDate = turnOnCol ? formatDateLocal(row.getCell(turnOnCol).value) : null;
+      const latestRenewContract = renewCol ? formatDateLocal(row.getCell(renewCol).value) : null;
+      const maContractExpired = expiredCol ? formatDateLocal(row.getCell(expiredCol).value) : null;
+      const latestMaintenance = latestMaintCol ? formatDateLocal(row.getCell(latestMaintCol).value) : null;
+      const maintenancePeriod = periodCol ? getCellValueText(row.getCell(periodCol).value) : '';
 
-      const turnOnDate = getCellValueText(row.getCell(15).value) || null;
-      const latestRenewContract = getCellValueText(row.getCell(16).value) || null;
-      const maContractExpired = getCellValueText(row.getCell(17).value) || null;
-      const latestMaintenance = getCellValueText(row.getCell(18).value) || null;
+      // Safe O&M Contract count
+      const rawOm = omCol ? getCellValueText(row.getCell(omCol).value) : '';
+      const omContractCount = parseOmContractCount(rawOm);
 
-      // Col 19: O&M Contract count (e.g. "6 / 6 Tax", "4 / 4 Tax" -> 6, 4)
-      const rawOm = getCellValueText(row.getCell(19).value);
-      let omContractCount = 4;
-      if (rawOm) {
-        const match = rawOm.match(/\d+/);
-        if (match) omContractCount = parseInt(match[0], 10) || 4;
+      // Map URL detection: from mapCol or cell hyperlinks
+      let mapUrl = '';
+      if (mapCol) {
+        const mapCell: any = row.getCell(mapCol);
+        mapUrl = mapCell?.hyperlink || getCellValueText(mapCell.value);
+      }
+      if (!mapUrl) {
+        const c2: any = row.getCell(nameCol);
+        if (c2?.hyperlink) mapUrl = c2.hyperlink;
       }
 
-      // Check for Google Maps hyperlink in row cells (Col 2 Solar Plant or Col 4/5 Location)
-      let mapUrl = '';
-      const cell2: any = row.getCell(2);
-      const cell4: any = row.getCell(4);
-      const cell5: any = row.getCell(5);
-      if (cell2?.hyperlink) mapUrl = cell2.hyperlink;
-      else if (cell4?.hyperlink) mapUrl = cell4.hyperlink;
-      else if (cell5?.hyperlink) mapUrl = cell5.hyperlink;
-
+      // Parse 12 rounds
       let completedCount = 0;
       for (let r = 1; r <= 12; r++) {
-        // Col 20 is Rd 1 Date, Col 21 is Rd 1 Done, Col 22 is Rd 2 Date, Col 23 is Rd 2 Done...
-        const dateCol = 18 + r * 2;
-        const doneCol = 19 + r * 2;
+        const dateCol = firstRoundCol + (r - 1) * 2;
+        const doneCol = dateCol + 1;
 
-        const rDate = getCellValueText(row.getCell(dateCol).value);
-        const rDone: any = row.getCell(doneCol).value;
-        const isDone = rDone === true || rDone === 'true' || rDone === 'TRUE' || rDone === 1;
+        const rawDate = row.getCell(dateCol).value;
+        const rDate = formatDateLocal(rawDate) || '';
+        const rawDone = row.getCell(doneCol).value;
+        const isDone = isCheckDone(rawDone);
+
         if (isDone) completedCount++;
 
         rounds.push({
           id: `${plantId}-r${r}`,
           solarPlantId: plantId,
           roundNumber: r,
-          scheduledDate: rDate || '',
+          scheduledDate: rDate,
           isCompleted: isDone,
           completedAt: isDone ? rDate || new Date().toISOString().split('T')[0] : null,
           teamName: 'Team A',
           countNumber: isDone ? r : null,
           note: '',
         });
+
+        if (isDone) {
+          history.push({
+            id: `hist-${plantId}-r${r}`,
+            solarPlantId: plantId,
+            solarPlantName: name,
+            roundNumber: r,
+            countNumber: r,
+            completedAt: rDate ? `${rDate}T10:00:00.000Z` : new Date().toISOString(),
+            teamName: 'Team A',
+            userName: 'Admin',
+            status: 'Completed',
+            note: `Maintenance Round ${r}`,
+          });
+        }
       }
 
       plants.push({
@@ -143,7 +298,7 @@ export const parseExcelFile = async (file: File): Promise<ParsedExcelData> => {
         latestRenewContract,
         maContractExpired,
         latestMaintenance,
-        maintenancePeriod: '',
+        maintenancePeriod,
         omContractCount,
         totalCount: completedCount,
         currentRound: Math.min(12, completedCount + 1),
@@ -189,7 +344,7 @@ export const parseExcelFile = async (file: File): Promise<ParsedExcelData> => {
     });
   }
 
-  return { plants, rounds, reports, sheetNames };
+  return { plants, rounds, history, reports, sheetNames };
 };
 
 /**

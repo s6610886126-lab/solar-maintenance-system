@@ -417,16 +417,20 @@ export function App() {
         <ExcelImportModal
           existingPlants={plants}
           onClose={() => setShowImportModal(false)}
-          onConfirmImport={(newP, newR, newRep, mode) => {
+          onConfirmImport={(newP, newR, newRep, mode, history) => {
             const existingNames = new Set(plants.map((p) => p.solarPlant.trim().toLowerCase()));
             const addedCount = mode === 'add_new_only'
               ? newP.filter((p) => !existingNames.has(p.solarPlant.trim().toLowerCase())).length
               : newP.length;
 
-            dataService.importData(newP, newR, newRep, mode);
+            dataService.importData(newP, newR, newRep, mode, history);
 
             const modeLabel = mode === 'add_new_only' ? 'Added new only' : mode === 'merge_update' ? 'Merged & Updated' : 'Replaced all';
             showToast(`Import Success (${modeLabel}): ${addedCount} Plants processed`, 'success');
+          }}
+          onRestoreSeed={() => {
+            dataService.restoreSeedData();
+            showToast('Restored 279 original solar plants successfully', 'success');
           }}
         />
       )}

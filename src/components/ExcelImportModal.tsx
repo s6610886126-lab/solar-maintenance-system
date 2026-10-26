@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Eye, ArrowRight } from 'lucide-react';
 import { parseExcelFile, ParsedExcelData } from '../lib/excelHandler';
-import { SolarPlant, MaintenanceRound, MAReport } from '../types/maintenance';
+import { SolarPlant, MaintenanceRound, MAReport, MaintenanceHistory } from '../types/maintenance';
 
 interface ExcelImportModalProps {
   existingPlants?: SolarPlant[];
@@ -10,14 +10,17 @@ interface ExcelImportModalProps {
     plants: SolarPlant[],
     rounds: MaintenanceRound[],
     reports: MAReport[],
-    mode: 'add_new_only' | 'merge_update' | 'replace_all'
+    mode: 'add_new_only' | 'merge_update' | 'replace_all',
+    history?: MaintenanceHistory[]
   ) => void;
+  onRestoreSeed?: () => void;
 }
 
 export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
   existingPlants = [],
   onClose,
   onConfirmImport,
+  onRestoreSeed,
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -51,7 +54,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
 
   const handleConfirm = () => {
     if (!parsedData) return;
-    onConfirmImport(parsedData.plants, parsedData.rounds, parsedData.reports, importMode);
+    onConfirmImport(parsedData.plants, parsedData.rounds, parsedData.reports, importMode, parsedData.history);
     onClose();
   };
 
@@ -72,9 +75,26 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-2">
+            {onRestoreSeed && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('คุณต้องการกู้คืนข้อมูลเดิม 279 โรงไฟฟ้า (พร้อมประวัติและรอบที่เสร็จสิ้นทั้งหมด) ใช่หรือไม่?')) {
+                    onRestoreSeed();
+                    onClose();
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center space-x-1.5 transition cursor-pointer"
+                title="กู้คืนข้อมูลโรงไฟฟ้าและรอบเดิมทั้งหมด"
+              >
+                <span>🔄 กู้คืนข้อมูลเดิม 279 แห่ง</span>
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}

@@ -110,6 +110,40 @@ class DataService {
           this.queueState.activePlantId = this.plants[0].id;
         }
       }
+
+      // Auto-heal if corrupted omContractCount from previous shifted import (e.g. 2024, 2025, 2026)
+      const hasCorruptedOm = this.plants.some((p) => (p.omContractCount && p.omContractCount >= 1000));
+      if (hasCorruptedOm) {
+        console.warn('Detected corrupted omContractCount (>= 1000) from previous import. Auto-healing plants and rounds from seed data...');
+        this.plants.forEach((p) => {
+          if (p.omContractCount && p.omContractCount >= 1000) {
+            const seed = seedPlants.find((sp) => sp.solarPlant.trim().toLowerCase() === p.solarPlant.trim().toLowerCase());
+            p.omContractCount = seed?.omContractCount || 4;
+            if (p.totalCount === 0 && seed?.totalCount) {
+              p.totalCount = seed.totalCount;
+              p.currentRound = seed.currentRound;
+            }
+          }
+        });
+
+        // Also restore rounds that had 0 completed if seed had completed
+        const completedRoundsInSeed = seedRounds.filter((r) => r.isCompleted);
+        completedRoundsInSeed.forEach((sr) => {
+          const matchRnd = this.rounds.find((r) => r.solarPlantId === sr.solarPlantId && r.roundNumber === sr.roundNumber);
+          if (matchRnd && !matchRnd.isCompleted) {
+            matchRnd.isCompleted = true;
+            matchRnd.completedAt = sr.completedAt;
+            matchRnd.scheduledDate = sr.scheduledDate || matchRnd.scheduledDate;
+            matchRnd.countNumber = sr.countNumber;
+          }
+        });
+
+        if (this.history.length === 0 && seedHistory.length > 0) {
+          this.history = [...seedHistory];
+        }
+
+        this.saveToStorage();
+      }
     } catch (e) {
       console.error('Error loading from local storage:', e);
       this.plants = [];
@@ -853,7 +887,8 @@ class DataService {
     newPlants: SolarPlant[],
     newRounds: MaintenanceRound[],
     newReports: MAReport[],
-    mode: 'add_new_only' | 'merge_update' | 'replace_all' = 'add_new_only'
+    mode: 'add_new_only' | 'merge_update' | 'replace_all' = 'add_new_only',
+    newHistory: MaintenanceHistory[] = []
   ) {
     localStorage.removeItem(KEY_CLEARED);
 
@@ -881,6 +916,9 @@ class DataService {
       }
       this.rounds = newRounds || [];
       this.reports = newReports || [];
+      if (newHistory && newHistory.length > 0) {
+        this.history = newHistory;
+      }
     } else if (mode === 'add_new_only') {
       const existingNames = new Set(this.plants.map((p) => p.solarPlant.trim().toLowerCase()));
       const existingIds = new Set(this.plants.map((p) => p.id));
@@ -943,7 +981,7 @@ class DataService {
       newPlants.forEach((p) => {
         const existing = existingMap.get(p.solarPlant.trim().toLowerCase());
         if (existing) {
-          if (p.capacityKw) existing.capacityKw = p.capacityKw;
+          if (p.capacityKw !== null && p.capacityKw !== undefined) existing.capacityKw = p.capacityKw;
           if (p.locationArea) existing.locationArea = p.locationArea;
           if (p.propertyVillage) existing.propertyVillage = p.propertyVillage;
           if (p.mapUrl) existing.mapUrl = p.mapUrl;
@@ -957,7 +995,25 @@ class DataService {
           if (p.turnOnDate) existing.turnOnDate = p.turnOnDate;
           if (p.latestRenewContract) existing.latestRenewContract = p.latestRenewContract;
           if (p.maContractExpired) existing.maContractExpired = p.maContractExpired;
-          if (p.omContractCount) existing.omContractCount = p.omContractCount;
+          if (p.latestMaintenance) existing.latestMaintenance = p.latestMaintenance;
+          if (p.omContractCount && p.omContractCount < 100) existing.omContractCount = p.omContractCount;
+          if (p.totalCount && p.totalCount > 0) {
+            existing.totalCount = p.totalCount;
+            existing.currentRound = p.currentRound;
+          }
+
+          // Update rounds for existing plant if incoming rounds have dates or completions
+          const incomingRounds = newRounds.filter((r) => r.solarPlantId === p.id);
+          incomingRounds.forEach((inRnd) => {
+            const matchExisting = this.rounds.find((r) => r.solarPlantId === existing.id && r.roundNumber === inRnd.roundNumber);
+            if (matchExisting) {
+              if (inRnd.scheduledDate) matchExisting.scheduledDate = inRnd.scheduledDate;
+              if (inRnd.isCompleted) {
+                matchExisting.isCompleted = true;
+                matchExisting.completedAt = inRnd.completedAt || matchExisting.completedAt;
+              }
+            }
+          });
         } else {
           trulyNewPlants.push(p);
         }
