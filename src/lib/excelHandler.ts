@@ -348,7 +348,7 @@ export const parseExcelFile = async (file: File): Promise<ParsedExcelData> => {
 };
 
 /**
- * Export Application Data back to .xlsx
+ * Export Application Data back to .xlsx matching the original company template format
  */
 export const exportToExcel = async (
   type: 'schedule' | 'history' | 'reports' | 'all',
@@ -363,125 +363,176 @@ export const exportToExcel = async (
   workbook.creator = 'Solar Maintenance Schedule System';
   workbook.created = new Date();
 
-  // Helper for header styling
-  const styleHeaderRow = (row: ExcelJS.Row, bgHex: string = '1E293B') => {
-    row.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-    row.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF' + bgHex },
-    };
-    row.alignment = { vertical: 'middle', horizontal: 'center' };
+  // Helper for thin black borders
+  const thinBorder = {
+    top: { style: 'thin' as const, color: { argb: 'FF000000' } },
+    bottom: { style: 'thin' as const, color: { argb: 'FF000000' } },
+    left: { style: 'thin' as const, color: { argb: 'FF000000' } },
+    right: { style: 'thin' as const, color: { argb: 'FF000000' } },
   };
 
-  // 1. Sheet: Maintenance Schedule
+  const dataBorder = {
+    top: { style: 'thin' as const, color: { argb: 'FFD1D5DB' } },
+    bottom: { style: 'thin' as const, color: { argb: 'FFD1D5DB' } },
+    left: { style: 'thin' as const, color: { argb: 'FFD1D5DB' } },
+    right: { style: 'thin' as const, color: { argb: 'FFD1D5DB' } },
+  };
+
+  // 1. Sheet: Maintenance Schedule (matching original 1.Maintenance Schedule format)
   if (type === 'schedule' || type === 'all') {
-    const sheet = workbook.addWorksheet('Maintenance Schedule');
-    
-    // Build columns matching the Excel sheet structure
-    const columns: Partial<ExcelJS.Column>[] = [
-      { header: 'No', key: 'no', width: 8 },
-      { header: 'Solar Plant', key: 'solarPlant', width: 35 },
-      { header: 'Capacity (kW)', key: 'capacityKw', width: 14 },
-      { header: 'Location Area', key: 'locationArea', width: 22 },
-      { header: 'Property / Village', key: 'propertyVillage', width: 24 },
-      { header: 'Status', key: 'status', width: 15 },
-      { header: 'QT & Contract', key: 'qtContract', width: 15 },
-      { header: 'Date Issue New Contract', key: 'dateIssueNewContract', width: 22 },
-      { header: 'Contract accept', key: 'contractAccept', width: 16 },
-      { header: 'PAID Date', key: 'paidDate', width: 16 },
-      { header: 'Name', key: 'contactName', width: 20 },
-      { header: 'Tel', key: 'tel', width: 20 },
-      { header: 'Email', key: 'email', width: 28 },
-      { header: 'Other contact', key: 'otherContact', width: 20 },
-      { header: 'Turn On Date', key: 'turnOnDate', width: 16 },
-      { header: 'Latest Renew Contract', key: 'latestRenewContract', width: 20 },
-      { header: 'MA Contract Expired', key: 'maContractExpired', width: 20 },
-      { header: 'Latest Maintenance', key: 'latestMaintenance', width: 18 },
-      { header: 'O&M Contract', key: 'omContractCount', width: 15 },
+    const sheet = workbook.addWorksheet('Maintenance Schedule', {
+      views: [{ state: 'frozen', xSplit: 2, ySplit: 3 }]
+    });
+
+    const colWidths = [
+      14.57, // 1: No
+      40.43, // 2: Solar Plant
+      12.29, // 3: Capacity (kW)
+      14.00, // 4: Location / Area
+      14.00, // 5: Property / Village
+      8.14,  // 6: Map (hidden)
+      16.00, // 7: Status
+      14.14, // 8: QT & Contract
+      15.57, // 9: Date Issue New Contract
+      15.14, // 10: Contract Accept
+      15.71, // 11: PAID Date
+      21.43, // 12: Name
+      21.86, // 13: Tel.
+      25.00, // 14: Email
+      23.71, // 15: Other Contact
+      16.57, // 16: Turn On Date
+      16.57, // 17: Latest Renew Contract
+      16.57, // 18: MA Contract Expired
+      17.57, // 19: Latest Maintenance
+      9.57,  // 20: Period (hidden)
+      7.29,  // 21: Count
+      8.14,  // 22: Round
+      // Rounds 1 to 12 (Date, Done)
+      11.29, 7.29, 11.29, 7.29, 11.29, 7.29, 11.29, 7.29, 11.29, 7.29, 11.29, 7.29,
+      11.29, 7.29, 11.29, 7.29, 11.29, 7.29, 11.29, 7.29, 11.29, 7.29, 11.29, 7.29,
+      35.00, // 47: Note
+      40.00, // 48: Email (hidden)
     ];
 
-    // Add 12 rounds
-    for (let r = 1; r <= 12; r++) {
-      const suffix = r === 1 ? '1st' : r === 2 ? '2nd' : r === 3 ? '3rd' : `${r}th`;
-      columns.push({ header: `${suffix} Date`, key: `r${r}_date`, width: 14 });
-      columns.push({ header: `${suffix} Done`, key: `r${r}_done`, width: 12 });
-    }
+    colWidths.forEach((w, idx) => {
+      const col = sheet.getColumn(idx + 1);
+      col.width = w;
+      if (idx + 1 === 6 || idx + 1 === 20 || idx + 1 === 48) {
+        col.hidden = true;
+      }
+    });
 
-    columns.push({ header: 'Google Maps Link', key: 'mapUrl', width: 40 });
-    sheet.columns = columns;
+    sheet.getRow(1).height = 15;
+    sheet.getRow(2).height = 15;
+    const r3 = sheet.getRow(3);
+    r3.height = 28;
 
-    styleHeaderRow(sheet.getRow(1), '0F766E');
+    const headerTitles = [
+      'No', 'Solar Plant', 'Capacity (kW)', 'Location / Area', 'Property / Village', 'Map', 'Status',
+      'QT & Contract', 'Date Issue New Contract', 'Contract Accept', 'PAID Date',
+      'Name', 'Tel.', 'Email', 'Other Contact',
+      'Turn On Date', 'Latest Renew Contract', 'MA Contract Expired', 'Latest Maintenance', 'Period',
+      'O&M Contract', '',
+      '1st', '', '2nd', '', '3rd', '', '4th', '', '5th', '', '6th', '',
+      '7th', '', '8th', '', '9th', '', '10th', '', '11th', '', '12th', '',
+      'Note', 'Email'
+    ];
 
-    data.plants.forEach((plant) => {
+    const headerColors: Record<number, { bg: string; fg: string }> = {
+      8: { bg: 'FF00FFFF', fg: 'FF000000' }, // QT cyan
+      9: { bg: 'FFFF9900', fg: 'FF000000' }, // Date Issue orange
+      10: { bg: 'FFFF9900', fg: 'FF000000' }, // Contract Accept orange
+      11: { bg: 'FF00FF00', fg: 'FF000000' }, // Paid Date green
+      16: { bg: 'FF00FF00', fg: 'FF000000' }, // Turn on green
+      17: { bg: 'FFFFFF00', fg: 'FF000000' }, // Renew yellow
+      18: { bg: 'FFFF0000', fg: 'FFFFFFFF' }, // Expired red
+      19: { bg: 'FF6AA84F', fg: 'FFFFFFFF' }, // Latest Maint olive
+      20: { bg: 'FF6AA84F', fg: 'FFFFFFFF' }, // Period olive
+    };
+
+    headerTitles.forEach((title, idx) => {
+      const colIdx = idx + 1;
+      const cell = r3.getCell(colIdx);
+      cell.value = title;
+      const color = headerColors[colIdx] || { bg: 'FFEFEFEF', fg: 'FF000000' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color.bg } };
+      cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: color.fg } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = thinBorder;
+    });
+
+    // Merge round headers
+    const merges = [
+      'U3:V3', 'W3:X3', 'Y3:Z3', 'AA3:AB3', 'AC3:AD3', 'AE3:AF3',
+      'AG3:AH3', 'AI3:AJ3', 'AK3:AL3', 'AM3:AN3', 'AO3:AP3', 'AQ3:AR3', 'AS3:AT3'
+    ];
+    merges.forEach((m) => {
+      try { sheet.mergeCells(m); } catch (e) {}
+    });
+
+    sheet.autoFilter = 'A3:AU3';
+
+    // Populate data rows starting at Row 4
+    data.plants.forEach((plant, pIdx) => {
+      const rowNum = 4 + pIdx;
+      const row = sheet.getRow(rowNum);
+      row.height = 22;
+
       const plantRounds = data.rounds.filter((r) => r.solarPlantId === plant.id);
-      
-      const rowData: Record<string, any> = {
-        no: plant.no || plant.queueNumber,
-        solarPlant: plant.solarPlant,
-        capacityKw: plant.capacityKw,
-        locationArea: plant.locationArea,
-        propertyVillage: plant.propertyVillage || '',
-        status: plant.status,
-        qtContract: String(plant.qtContract).toLowerCase() === 'true' || plant.qtContract === 'มี' ? 'TRUE' : 'FALSE',
-        dateIssueNewContract: plant.dateIssueNewContract || '',
-        contractAccept: String(plant.contractAccept).toLowerCase() === 'true' || plant.contractAccept === 'ตอบรับแล้ว' ? 'TRUE' : 'FALSE',
-        paidDate: plant.paidDate || '',
-        contactName: plant.contactName,
-        tel: plant.tel,
-        email: plant.email,
-        otherContact: plant.otherContact || '',
-        turnOnDate: plant.turnOnDate || '',
-        latestRenewContract: plant.latestRenewContract || '',
-        maContractExpired: plant.maContractExpired || '',
-        latestMaintenance: plant.latestMaintenance || '',
-        omContractCount: `${plant.omContractCount || 4} times/year`,
-        mapUrl: plant.mapUrl || '',
-      };
 
+      const rowValues: any[] = [
+        plant.no || plant.queueNumber || (pIdx + 1),
+        plant.solarPlant,
+        plant.capacityKw !== null && plant.capacityKw !== undefined ? plant.capacityKw : null,
+        plant.locationArea || '',
+        plant.propertyVillage || '',
+        plant.mapUrl || '',
+        plant.status || 'Active',
+        String(plant.qtContract).toLowerCase() === 'true' || plant.qtContract === 'มี' ? 'TRUE' : 'FALSE',
+        plant.dateIssueNewContract || '',
+        String(plant.contractAccept).toLowerCase() === 'true' || plant.contractAccept === 'ตอบรับแล้ว' ? 'TRUE' : 'FALSE',
+        plant.paidDate || '',
+        plant.contactName || '',
+        plant.tel || '',
+        plant.email || '',
+        plant.otherContact || '',
+        plant.turnOnDate || '',
+        plant.latestRenewContract || '',
+        plant.maContractExpired || '',
+        plant.latestMaintenance || '',
+        plant.maintenancePeriod || '',
+        plant.totalCount || 0,
+        plant.omContractCount || 4,
+      ];
+
+      // 12 rounds
       for (let r = 1; r <= 12; r++) {
         const rnd = plantRounds.find((round) => round.roundNumber === r);
-        rowData[`r${r}_date`] = rnd?.scheduledDate || '';
-        rowData[`r${r}_done`] = rnd?.isCompleted ? 'TRUE' : 'FALSE';
+        rowValues.push(rnd?.scheduledDate || '');
+        rowValues.push(rnd?.isCompleted ? 'TRUE' : 'FALSE');
       }
 
-      sheet.addRow(rowData);
-    });
-  }
+      rowValues.push(plant.note || '');
+      rowValues.push(plant.email || '');
 
-  // 2. Sheet: Maintenance History
-  if (type === 'history' || type === 'all') {
-    const sheet = workbook.addWorksheet('Maintenance History');
-    sheet.columns = [
-      { header: 'History ID', key: 'id', width: 28 },
-      { header: 'Solar Plant', key: 'solarPlantName', width: 35 },
-      { header: 'Round', key: 'roundNumber', width: 12 },
-      { header: 'Count', key: 'countNumber', width: 12 },
-      { header: 'Completed Date & Time', key: 'completedAt', width: 25 },
-      { header: 'Team', key: 'teamName', width: 18 },
-      { header: 'Recorded By', key: 'userName', width: 18 },
-      { header: 'Status', key: 'status', width: 15 },
-      { header: 'Note', key: 'note', width: 30 },
-    ];
+      rowValues.forEach((val, cIdx) => {
+        const colNum = cIdx + 1;
+        const cell = row.getCell(colNum);
+        cell.value = val;
+        cell.font = { name: 'Calibri', size: 10 };
+        cell.border = dataBorder;
 
-    styleHeaderRow(sheet.getRow(1), '2563EB');
-
-    data.history.forEach((h) => {
-      sheet.addRow({
-        id: h.id,
-        solarPlantName: h.solarPlantName,
-        roundNumber: `Round ${h.roundNumber}`,
-        countNumber: h.countNumber,
-        completedAt: h.completedAt,
-        teamName: h.teamName,
-        userName: h.userName,
-        status: h.status,
-        note: h.note,
+        // Left align names, locations, notes
+        const isLeftAlign = colNum === 2 || colNum === 4 || colNum === 5 || colNum === 12 || colNum === 14 || colNum === 15 || colNum === 47;
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: isLeftAlign ? 'left' : 'center',
+        };
       });
     });
   }
 
-  // 3. Sheet: MA Report Tracking
+  // 2. Sheet: MA Report Tracking
   if (type === 'reports' || type === 'all') {
     const sheet = workbook.addWorksheet('MA Report Tracking');
     sheet.columns = [
@@ -496,7 +547,10 @@ export const exportToExcel = async (
       { header: 'Note', key: 'note', width: 25 },
     ];
 
-    styleHeaderRow(sheet.getRow(1), '9333EA');
+    const hRow = sheet.getRow(1);
+    hRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+    hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } };
+    hRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
     data.reports.forEach((rep, idx) => {
       sheet.addRow({
@@ -509,6 +563,41 @@ export const exportToExcel = async (
         omContract: rep.omContract,
         roundNumber: rep.roundNumber,
         note: rep.note,
+      });
+    });
+  }
+
+  // 3. Sheet: Maintenance History
+  if (type === 'history' || type === 'all') {
+    const sheet = workbook.addWorksheet('Maintenance History');
+    sheet.columns = [
+      { header: 'History ID', key: 'id', width: 28 },
+      { header: 'Solar Plant', key: 'solarPlantName', width: 35 },
+      { header: 'Round', key: 'roundNumber', width: 12 },
+      { header: 'Count', key: 'countNumber', width: 12 },
+      { header: 'Completed Date & Time', key: 'completedAt', width: 25 },
+      { header: 'Team', key: 'teamName', width: 18 },
+      { header: 'Recorded By', key: 'userName', width: 18 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Note', key: 'note', width: 30 },
+    ];
+
+    const hRow = sheet.getRow(1);
+    hRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+    hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    hRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    data.history.forEach((h) => {
+      sheet.addRow({
+        id: h.id,
+        solarPlantName: h.solarPlantName,
+        roundNumber: `Round ${h.roundNumber}`,
+        countNumber: h.countNumber,
+        completedAt: h.completedAt,
+        teamName: h.teamName,
+        userName: h.userName,
+        status: h.status,
+        note: h.note,
       });
     });
   }
